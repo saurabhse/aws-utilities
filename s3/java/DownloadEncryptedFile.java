@@ -4,7 +4,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.util.List;
 
-import org.omg.CORBA.portable.InputStream;
+
 
 public class DownloadEncryptedFile {
 	
@@ -21,8 +21,8 @@ public class DownloadEncryptedFile {
 		String symmetryKey = args[1];
 		
 		byte[] encodedPrivateKey = Base64.decodeBase64(symmetryKey);
-		SecretKey secretKey = SecretKeySpec(encodedPrivateKey,"AES");
-		EncriptionMaterials encryptionMaterials = new EncryptionMaterials(secretKey);
+		SecretKey secretKey = new SecretKeySpec(encodedPrivateKey,"AES");
+		EncryptionMaterials encryptionMaterials = new EncryptionMaterials(secretKey);
 		BasicAWSCredentials awsCreds = new BasicAWSCredentials("","");
 		AmazonS3EncryptionClient encryptionClient = null;
 		ClientConfiguration clientConfig = new ClientConfiguration();
@@ -57,12 +57,12 @@ public class DownloadEncryptedFile {
 				JSONArray entries = jsonObj.getJSONArray("entries");
 				if(entries != null) {
 					fileList = new ArrayList<String>(entries.length());
-					for(int i = 0 ;i<entries.length;i++) {
+					for(int i = 0 ;i<entries.length();i++) {
 						fileList.add(entries.getJSONObject(i).getString("url"));
 					}
 				}
 			}catch(IOException | JSONException e) {
-				throw RuntimeException(e);
+				throw new RuntimeException(e);
 			}finally {
 				if(is!=null) {
 					try {
