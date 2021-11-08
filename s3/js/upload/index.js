@@ -1,4 +1,4 @@
-import { mapEsLocations } from '';
+import { mapEs } from './mapEs';
 import { LOGGER } from '';
 import { esClient, INDEX } from './esClient';
 import { uploadToS3 } from './uploadToS3';
@@ -9,8 +9,8 @@ export const handler = async () => {
 
   try {
     const allRecords = await fetchLocations();
-    LOGGER.info(`Fetched  ${allRecords.length} locations from elastic search`);
-    const stations = allRecords.map((hit) => mapEsLocationToStationDetail(hit._source));
+    LOGGER.info(`Fetched  ${allRecords.length} from elastic search`);
+    const stations = allRecords.map((hit) => mapEs(hit._source));
     await uploadToS3(stations);
     return {
       statusCode: 0,
