@@ -1,0 +1,110 @@
+
+import AWS from 'aws-sdk';
+import { LOGGER } from '';
+import archiver from 'archiver';
+import stream from 'stream';
+import { configuration } from './configuration';
+
+const S3 = new AWS.S3({
+  apiVersion: '2006-03-01',
+  signatureVersion: 'v4',
+  httpOptions: {
+    timeout: 900000,
+  },
+});
+
+
+export const uploadToS3 = async (obj) => {
+  const buffer = Buffer.from(getDataToUpload(obj));
+  try {
+    await zipFile(buffer);
+    LOGGER.info(' uploaded successfully');
+  } catch (e) {
+    LOGGER.error('Upload of  zip file failed');
+    throw e;
+  }
+
+};
+
+export const zipFile = async (buffer: Buffer) => {
+  LOGGER.info('Starting zipping file.');
+  let files = [configuration.JSON_FILENAME] as any;
+  try {
+    files = files.map((file) => {
+      return {
+        fileName: configuration.JSON_FILENAME,
+        key:  configuration.JSON_FILENAME,
+        type: 'file',
+      };
+    });
+
+    LOGGER.info(`Files to zip :  ${JSON.stringify(files)}`);
+    await streamToZipInS3(files, buffer);
+
+  }
+  catch (error) {
+    LOGGER.error(`Error while zipping files : ${error}`);
+    throw error;
+  }
+};
+
+export async function streamToZipInS3(files, buffer) {
+  await new Promise( (resolve, reject) => {
+    LOGGER.info(`Uploading zip file to bucket ${configuration.UPLOAD_BUCKET_NAME}`);
+    const zipStream = streamTo(configuration.UPLOAD_BUCKET_NAME, resolve, reject);
+    zipStream.on('error', reject);
+
+    const archive = archiver('zip');
+    archive.on('error', (err) => {
+      LOGGER.error(`Error in archive operation : ${err}`);
+      throw new Error(err);
+    });
+    archive.pipe(zipStream);
+
+    for (const file of files) {
+      if (file['type'] == 'file') {
+        archive.append(buffer, {
+          name: file['fileName'],
+        });
+      }
+    }
+    archive.finalize();
+  })
+    .catch((err) => {
+      LOGGER.error(`Error while zipping in s3 : ${err}`);
+      throw new Error(err);
+    });
+}
+
+function streamTo(bucket, resolve, reject) {
+  const passthrough = new stream.PassThrough();
+  S3.upload(
+    {
+      Bucket: bucket,
+      Key: configuration.DESTINATION_KEY,
+      Body: passthrough,
+      ContentType: 'application/zip',
+      ServerSideEncryption: 'AES256',
+    },
+    (err, data) => {
+      if (err) {
+        LOGGER.error('Error while uploading zip to s3');
+        throw new Error(err);
+        reject(err);
+      }
+      LOGGER.info('Zip file uploaded.');
+      resolve(data);
+    },
+  ).on('httpUploadProgress', (progress) => {
+    LOGGER.info('Zip file upload in progress...');
+  });
+  return passthrough;
+}
+
+const getDataToUpload = (obj) => {
+  return JSON.stringify(
+    {
+      stations: obj,
+      companies: [],
+    });
+};
